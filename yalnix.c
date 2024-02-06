@@ -35,7 +35,8 @@ typedef struct Pcb {
 	unsigned waitingPid	: 1;
   struct Pcb* deadChildrenHead;
 } Pcb_t;
-////////////////////////// GLOBALS \\\\\\\\\\\\\\\\\\\\\\\\\\
+////////////////////////// GLOBALS //////////////////////////
+
 // Total clock ticks
 unsigned long CLOCK;
 // Pointer to current PCB
@@ -46,12 +47,13 @@ int BRK;
 // Ready Queue
 Pcb_t* READY_QUEUE_HEAD;
 Pcb_t* READY_QUEUE_TAIL;
+
 // PCB stuff
 // we want to make a large table indexed by pid, mapped to Pcbs
 Pcb_t* pcbTable[1000];
 
 
-////////////////////////// Booting \\\\\\\\\\\\\\\\\\\\\\\\\\
+////////////////////////// Booting //////////////////////////
 
 void
 KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {

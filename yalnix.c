@@ -17,7 +17,7 @@
 #include <ctype.h>
 
 
-////////////////////////// DATA STRUCTURES \\\\\\\\\\\\\\\\\\\\\\\\\\
+////////////////////////// DATA STRUCTURES //////////////////////////
 
 // Remember to flush the TLB every time we switch processes.
 
@@ -57,7 +57,25 @@ Pcb_t* pcbTable[1000];
 
 void
 KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
-	// Set up a bit vector to track free frames
+  TracePrintf(0, "Hello world.\n");
+
+  // Set up a bit vector to track free frames
+
+  // Calculate the number of frames available.
+  int num_phys_frames = pmem_size / PAGESIZE;
+  TracePrintf(0, "Number of frames: %d\n", num_phys_frames);
+
+  // Initialize an empty bit array of 0s of size num_frames, full of 0s.
+
+  // Can we assume 4 bytes in an int? Or should we go about somehow else...
+  // Could also go with the queue of free fame option..
+  // 32 bits per int
+  // So we need math.ceil(num_phys_frames / 32)?
+
+
+  
+
+
   // Initialize init PCB
 	// Initialize interrupt handler bit vector and write to register
 	// Set up the initial Region 0 page table
@@ -80,7 +98,7 @@ SetKernelBrk(void * addr) {
   // Return 0
 }
 
-////////////////////////// INTERRUPTION HANDLERS \\\\\\\\\\\\\\\\\\\\\\\\\
+////////////////////////// INTERRUPTION HANDLERS //////////////////////////
 
 void 
 TrapKernel(UserContext* context) {

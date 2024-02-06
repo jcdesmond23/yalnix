@@ -15,6 +15,7 @@
 #include <yuser.h>
 #include <hardware.h>
 #include <ctype.h>
+#include <sys/types.h>
 
 
 ////////////////////////// DATA STRUCTURES //////////////////////////
@@ -53,6 +54,15 @@ Pcb_t* READY_QUEUE_TAIL;
 Pcb_t* pcbTable[1000];
 
 
+struct pfn_node {
+  struct pfn_node* next;
+  struct pfn_node* prev;
+  u_long pfn     : 24;
+};
+
+typedef struct pfn_node pfn_node_t;
+
+
 ////////////////////////// Booting //////////////////////////
 
 void
@@ -64,17 +74,38 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
   // Calculate the number of frames available.
   int num_phys_frames = pmem_size / PAGESIZE;
   TracePrintf(0, "Number of frames: %d\n", num_phys_frames);
+  TracePrintf(0, "PMEM_BASE: %d\n", PMEM_BASE);
+
+  // Initialize bit array
+
+  TracePrintf(0, "_first_kernel_text_page: %d\n", _first_kernel_text_page);
+  TracePrintf(0, "_first_kernel_data_page: %d\n", _first_kernel_data_page);
+  TracePrintf(0, "_orig_kernel_brk_page: %d\n", _orig_kernel_brk_page);
+
+  // Do something like this later, maybe. But for now just use an int array.
+  // int sizeOfBitMap = (num_phys_frames + 31) / 32;
+  // u_int32_t* freeFrames = calloc(sizeOfBitMap, sizeof(u_int32_t));
+  // if (freeFrames == NULL) {
+  //   TracePrintf(0, "Error initializing free frame bit vector.\n");
+  // }
+  
+  // Initialize "bit" vector for free frame tracking
+  u_int8_t* freeFrames = calloc(num_phys_frames, sizeof(u_int8_t));
+
+  // Mark every page below _first_kernel_text_page as used so we don't touch it
+  for (int i = 0; i < _first_kernel_text_page; i++) {
+    freeFrames[i] = 1;
+  }
+    
+
+  // do we just map everything from [_first_kernel_text_page, _orig_kernel_brk_page) to physical mem?
+  
+  // what are the valid pages?
+    // Everything below _first_kernel_text page is unmapped space with validity 0. Do we just not add these
+    // to the frame q?
+    // Last valid page is 
 
   // Initialize an empty bit array of 0s of size num_frames, full of 0s.
-
-  // Can we assume 4 bytes in an int? Or should we go about somehow else...
-  // Could also go with the queue of free fame option..
-  // 32 bits per int
-  // So we need math.ceil(num_phys_frames / 32)?
-
-
-  
-
 
   // Initialize init PCB
 	// Initialize interrupt handler bit vector and write to register
@@ -82,7 +113,10 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
 	// Set up Region 1 page table for idle
 	// Has one valid page for idle’s user stack
 	// Write to the page table registers to tell the hardware where the page tables are located in memory
+
   // Write to the Virtual Memory Enable Register to enable virtual memory
+  // WriteRegister(REG_VM_ENABLE, 1);
+
   // initialize init process
   // initialize idle process
 } 

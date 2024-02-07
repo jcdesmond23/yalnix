@@ -9,12 +9,11 @@
 
 
 # Where's your kernel source?
-K_SRC_DIR = ./
+K_SRC_DIR = .
 
 # What are the kernel c and include files?
 K_SRCS = yalnix.c
-K_INCS = 
-# $(wildcard $(YALNIX_FRAMEWORK)/include/*.h)
+K_INCS =
 
 # Where's your user source?
 U_SRC_DIR = 

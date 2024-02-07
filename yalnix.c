@@ -49,6 +49,8 @@ int BRK;
 Pcb_t* READY_QUEUE_HEAD;
 Pcb_t* READY_QUEUE_TAIL;
 
+typedef void (*handlerFunction)(UserContext*);
+
 // PCB stuff
 // we want to make a large table indexed by pid, mapped to Pcbs
 Pcb_t* pcbTable[1000];
@@ -116,7 +118,17 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
 
 
   // Initialize init PCB
-	// Initialize interrupt handler bit vector and write to register
+	// Initialize interrupt handler vector and write to register
+  typedef void (*handlerFunction)(UserContext*);
+  handlerFunction* handlerTable = malloc(sizeof(handlerFunction) * TRAP_VECTOR_SIZE);
+  handlerTable[TRAP_KERNEL] = &TrapKernel;
+  handlerTable[TRAP_CLOCK] = &TrapClock;
+  for (int i = 0; i < TRAP_VECTOR_SIZE; i++) {
+    if (i > 1) {
+      handlerTable[i] = &TrapUnhandled;
+    }
+  }
+  WriteRegister(REG_VECTOR_BASE, &handlerTable);
 	// Set up the initial Region 0 page table
 	// Set up Region 1 page table for idle
 	// Has one valid page for idle’s user stack
@@ -160,7 +172,7 @@ TrapClock(UserContext* context) {
 }
 
 void 
-TrapUnhandled() {
+TrapUnhandled(UserContext* context) {
   // Unhandled trap handler
   TracePrintf(1, "Unhandled trap!");
 }

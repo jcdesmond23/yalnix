@@ -54,13 +54,13 @@ Pcb_t* READY_QUEUE_TAIL;
 Pcb_t* pcbTable[1000];
 
 
-struct pfn_node {
-  struct pfn_node* next;
-  struct pfn_node* prev;
-  u_long pfn     : 24;
-};
+// struct pfn_node {
+//   struct pfn_node* next;
+//   struct pfn_node* prev;
+//   u_long pfn     : 24;
+// };
 
-typedef struct pfn_node pfn_node_t;
+// typedef struct pfn_node pfn_node_t;
 
 
 ////////////////////////// Booting //////////////////////////
@@ -90,22 +90,30 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
   // }
   
   // Initialize "bit" vector for free frame tracking
+  // freeFrames[pfn] = 0 means the frame is free, = 1 means the frame is taken
   u_int8_t* freeFrames = calloc(num_phys_frames, sizeof(u_int8_t));
 
   // Mark every page below _first_kernel_text_page as used so we don't touch it
   for (int i = 0; i < _first_kernel_text_page; i++) {
     freeFrames[i] = 1;
   }
-    
+  
+  // set up the page table.
+
+  pte_t* pageTable = malloc(num_phys_frames * sizeof(pte_t));
+  if (pageTable == NULL) { }
+  // how many entries in the page table? --> num_phys_frames?
+  for (int i = 0; i < num_phys_frames; i++) {
+    pageTable[i].pfn = 0;
+    pageTable[i].valid = 0;
+    pageTable[i].prot = 0;
+  }
 
   // do we just map everything from [_first_kernel_text_page, _orig_kernel_brk_page) to physical mem?
-  
-  // what are the valid pages?
-    // Everything below _first_kernel_text page is unmapped space with validity 0. Do we just not add these
-    // to the frame q?
-    // Last valid page is 
+  for (int i = 0; i < _orig_kernel_brk_page - _first_kernel_text_page; i++) {
+    
+  }
 
-  // Initialize an empty bit array of 0s of size num_frames, full of 0s.
 
   // Initialize init PCB
 	// Initialize interrupt handler bit vector and write to register

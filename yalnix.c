@@ -17,6 +17,11 @@
 #include <ctype.h>
 #include <sys/types.h>
 
+////////////////////////// FUNCTION HEADERS //////////////////////////
+
+void TrapKernel(UserContext* context);
+void TrapClock(UserContext* context);
+void TrapUnhandled(UserContext* context);
 
 ////////////////////////// DATA STRUCTURES //////////////////////////
 
@@ -43,8 +48,8 @@ unsigned long CLOCK;
 // Pointer to current PCB
 Pcb_t* CURR_PCB;
 // Flag indicating whether virtual memory is enabled
-int VIRTUAL_MEMORY_ENABLED;
-int BRK;
+int VIRTUAL_MEMORY_ENABLED = 0;
+int BRK;    // first unused page
 // Ready Queue
 Pcb_t* READY_QUEUE_HEAD;
 Pcb_t* READY_QUEUE_TAIL;
@@ -72,6 +77,8 @@ pte_t* pageTable;
 void
 KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
   TracePrintf(0, "Hello world.\n");
+
+  BRK = _orig_kernel_brk_page;
 
   // Set up a bit vector to track free frames
 
@@ -130,9 +137,14 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
     pageTable[i].prot |= PROT_ALL;
   }
 
-  TracePrintf(0, "KERNEL STACK LIMIT: %d\n", KERNEL_STACK_LIMIT >> PAGESHIFT);
-  TracePrintf(0, "KERNEL STACK BASE: %d\n", KERNEL_STACK_BASE >> PAGESHIFT);
-
+  if (BRK > _orig_kernel_brk_page) {
+    int newKernelBrkPage = UP_TO_PAGE(BRK);
+    for (int i = _orig_kernel_brk_page; i <= newKernelBrkPage; i++) {
+      pageTable[i].pfn = i;
+      pageTable[i].valid = 1;
+      pageTable[i].prot |= PROT_ALL;
+    }
+  }
 
   // Initialize init PCB
 	// Initialize interrupt handler vector and write to register
@@ -160,6 +172,20 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
 
 int 
 SetKernelBrk(void * addr) {
+  int addrPage = UP_TO_PAGE(addr);
+  if (!VIRTUAL_MEMORY_ENABLED) {
+    if (addrPage >= BRK) {
+      BRK = addrPage + 1;
+      return 0;
+    }
+    // if we're malloc'ing into the stack
+    if (addrPage >= KERNEL_STACK_BASE >> PAGESHIFT) {
+      return ERROR;
+    }
+  }
+  else {
+    // figure out later.
+  }
 	// If not enough memory is available
   	// return ERROR
   // If addr is not valid

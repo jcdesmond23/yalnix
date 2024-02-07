@@ -22,24 +22,19 @@
 void TrapKernel(UserContext* context);
 void TrapClock(UserContext* context);
 void TrapUnhandled(UserContext* context);
+void DoIdle(void);
 
 ////////////////////////// DATA STRUCTURES //////////////////////////
 
 // Remember to flush the TLB every time we switch processes.
 
 typedef struct Pcb {
-  int pid;
   UserContext uCtxt;
   KernelContext kKtxt;
-  struct Pcb* livingChildrenHead;
-  int brk;
-  int parentPid;
-  unsigned alive	: 1;
-  int exitStatus;
-  struct Pcb* next;
-  struct Pcb* prev;
-	unsigned waitingPid	: 1;
-  struct Pcb* deadChildrenHead;
+  int baseStackFrame;
+  int topStackFrame;
+  int pageTableBase;
+  int limitPageTable;
 } Pcb_t;
 ////////////////////////// GLOBALS //////////////////////////
 
@@ -137,6 +132,33 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
     pageTable[i].prot |= PROT_ALL;
   }
 
+  for (int i = VMEM_1_BASE >> PAGESHIFT; i < VMEM_1_LIMIT >> PAGESHIFT - 1; i++) {
+    pageTable[i].pfn = i;
+    freeFrames[i] = 1;
+    pageTable[i].valid = 0;
+    pageTable[i].prot = 0;
+  }
+  int idleStackPage = VMEM_1_LIMIT >> PAGESHIFT - 1;
+  freeFrames[idleStackPage] = 1;
+  pageTable[idleStackPage].pfn = idleStackPage;
+  pageTable[idleStackPage].valid = 1;
+  pageTable[idleStackPage].prot |= PROT_ALL;
+  WriteRegister(REG_PTBR0, VMEM_0_BASE);
+  WriteRegister(REG_PTLR0, VMEM_0_SIZE >> PAGESHIFT);
+  WriteRegister(REG_PTBR1, VMEM_1_BASE);
+  WriteRegister(REG_PTLR1, VMEM_1_SIZE >> PAGESHIFT);
+
+  // Initialize init PCB
+	// Initialize interrupt handler vector and write to register
+  typedef void (*handlerFunction)(UserContext*);
+  handlerFunction* handlerTable = malloc(sizeof(handlerFunction) * TRAP_VECTOR_SIZE);
+  handlerTable[TRAP_KERNEL] = &TrapKernel;
+  handlerTable[TRAP_CLOCK] = &TrapClock;
+  for (int i = TRAP_CLOCK + 1; i < TRAP_VECTOR_SIZE; i++) {
+    handlerTable[i] = &TrapUnhandled;
+  }
+  WriteRegister(REG_VECTOR_BASE, (unsigned int) &handlerTable);
+
   if (BRK > _orig_kernel_brk_page) {
     int newKernelBrkPage = UP_TO_PAGE(BRK);
     for (int i = _orig_kernel_brk_page; i <= newKernelBrkPage; i++) {
@@ -146,28 +168,15 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
     }
   }
 
-  // Initialize init PCB
-	// Initialize interrupt handler vector and write to register
-  typedef void (*handlerFunction)(UserContext*);
-  handlerFunction* handlerTable = malloc(sizeof(handlerFunction) * TRAP_VECTOR_SIZE);
-  handlerTable[TRAP_KERNEL] = &TrapKernel;
-  handlerTable[TRAP_CLOCK] = &TrapClock;
-  for (int i = 0; i < TRAP_VECTOR_SIZE; i++) {
-    if (i > 1) {
-      handlerTable[i] = &TrapUnhandled;
-    }
-  }
-  WriteRegister(REG_VECTOR_BASE, &handlerTable);
-	// Set up the initial Region 0 page table
-	// Set up Region 1 page table for idle
-	// Has one valid page for idle’s user stack
-	// Write to the page table registers to tell the hardware where the page tables are located in memory
-
   // Write to the Virtual Memory Enable Register to enable virtual memory
-  // WriteRegister(REG_VM_ENABLE, 1);
-
-  // initialize init process
-  // initialize idle process
+  WriteRegister(REG_VM_ENABLE, 1);
+  Pcb_t idlePCB;
+  idlePCB.uCtxt = *uctxt;
+  idlePCB.uCtxt.pc = &DoIdle;
+  idlePCB.uCtxt.sp = (void*) VMEM_1_LIMIT;
+  uctxt->pc = idlePCB.uCtxt.pc;
+  uctxt->sp = (void*) VMEM_1_LIMIT - 1;
+  TracePrintf(1, "Leaving KernelStart!\n");
 } 
 
 int 
@@ -186,13 +195,7 @@ SetKernelBrk(void * addr) {
   else {
     // figure out later.
   }
-	// If not enough memory is available
-  	// return ERROR
-  // If addr is not valid
-  	// return ERROR
-  // Call helper function to round addr to nearest page
-  // global BRK = rounded addr
-  // Return 0
+  return 0;
 }
 
 ////////////////////////// INTERRUPTION HANDLERS //////////////////////////

@@ -53,6 +53,8 @@ Pcb_t* READY_QUEUE_TAIL;
 // we want to make a large table indexed by pid, mapped to Pcbs
 Pcb_t* pcbTable[1000];
 
+u_int8_t* freeFrames;
+pte_t* pageTable;
 
 // struct pfn_node {
 //   struct pfn_node* next;
@@ -78,10 +80,6 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
 
   // Initialize bit array
 
-  TracePrintf(0, "_first_kernel_text_page: %d\n", _first_kernel_text_page);
-  TracePrintf(0, "_first_kernel_data_page: %d\n", _first_kernel_data_page);
-  TracePrintf(0, "_orig_kernel_brk_page: %d\n", _orig_kernel_brk_page);
-
   // Do something like this later, maybe. But for now just use an int array.
   // int sizeOfBitMap = (num_phys_frames + 31) / 32;
   // u_int32_t* freeFrames = calloc(sizeOfBitMap, sizeof(u_int32_t));
@@ -91,7 +89,7 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
   
   // Initialize "bit" vector for free frame tracking
   // freeFrames[pfn] = 0 means the frame is free, = 1 means the frame is taken
-  u_int8_t* freeFrames = calloc(num_phys_frames, sizeof(u_int8_t));
+  freeFrames = calloc(num_phys_frames, sizeof(u_int8_t));
 
   // Mark every page below _first_kernel_text_page as used so we don't touch it
   for (int i = 0; i < _first_kernel_text_page; i++) {
@@ -100,7 +98,7 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
   
   // set up the page table.
 
-  pte_t* pageTable = malloc(num_phys_frames * sizeof(pte_t));
+  pageTable = malloc(num_phys_frames * sizeof(pte_t));
   if (pageTable == NULL) { }
   // how many entries in the page table? --> num_phys_frames?
   for (int i = 0; i < num_phys_frames; i++) {
@@ -110,9 +108,28 @@ KernelStart(char *cmd_args[],  unsigned int pmem_size, UserContext *uctxt) {
   }
 
   // do we just map everything from [_first_kernel_text_page, _orig_kernel_brk_page) to physical mem?
-  for (int i = 0; i < _orig_kernel_brk_page - _first_kernel_text_page; i++) {
-    
+  for (int i = _first_kernel_text_page; i < _orig_kernel_brk_page; i++) {
+    pageTable[i].pfn = i;
+    freeFrames[i] = 1;
+    pageTable[i].valid = 1;
+    if (i < _first_kernel_data_page) {
+      pageTable[i].prot |= PROT_READ;
+      pageTable[i].prot |= PROT_EXEC;
+    }
+    else {
+      pageTable[i].prot |= PROT_ALL;
+    }
   }
+
+  for (int i = KERNEL_STACK_BASE >> PAGESHIFT; i < KERNEL_STACK_LIMIT >> PAGESHIFT; i++) {
+    pageTable[i].pfn = i;
+    freeFrames[i] = 1;
+    pageTable[i].valid = 1;
+    pageTable[i].prot |= PROT_ALL;
+  }
+
+  TracePrintf(0, "KERNEL STACK LIMIT: %d\n", KERNEL_STACK_LIMIT >> PAGESHIFT);
+  TracePrintf(0, "KERNEL STACK BASE: %d\n", KERNEL_STACK_BASE >> PAGESHIFT);
 
 
   // Initialize init PCB
